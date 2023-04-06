@@ -62,23 +62,190 @@ public class AutoTestJackLiam extends OpMode {
 
     AprilTagDetection tagOfInterest = null;
 
+
+
     @Override
     public void init() {
 
+        // Motors and Servos
+        frontleftDrive = hardwareMap.get(DcMotor.class, "front_left_drive");
+        frontrightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
+        backleftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
+        backrightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
+        middleslideDrive = hardwareMap.get(DcMotor.class, "middle_slides_drive");
+
+        rightgripperDrive = hardwareMap.get(Servo.class, "right_gripper_drive");
+        leftgripperDrive = hardwareMap.get(Servo.class, "left_gripper_drive");
+
+        frontleftDrive.setDirection(DcMotor.Direction.REVERSE);
+        frontrightDrive.setDirection(DcMotor.Direction.FORWARD);
+        backleftDrive.setDirection(DcMotor.Direction.REVERSE);
+        backrightDrive.setDirection(DcMotor.Direction.FORWARD);
+        middleslideDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        frontleftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        frontrightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        backleftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        backrightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        middleslideDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        frontleftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        frontrightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        backleftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        backrightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        middleslideDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        //imu
+        imu = hardwareMap.get(IMU.class, "imu");
+        IMU.Parameters myIMUparameters;
+
+        myIMUparameters = new IMU.Parameters(
+                new RevHubOrientationOnRobot(
+                        RevHubOrientationOnRobot.LogoFacingDirection.LEFT,
+                        RevHubOrientationOnRobot.UsbFacingDirection.UP
+                )
+        );
+
+
+        //Camera
+        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        OpenCvCamera camera = OpenCvCameraFactory.getInstance().createInternalCamera(OpenCvInternalCamera.CameraDirection.BACK, cameraMonitorViewId);
+        aprilTagDetectionPipeline = new AprilTagDetectionPipeline(tagSize, fx, fy, cx, cy);
+
+        telemetry.setMsTransmissionInterval(50);
+
+        SampleMecanumDrive drive = new SampleMecanumDrive(hardwareMap);
+
+        Pose2d startPose = new Pose2d(-36, -63, Math.toRadians(90));
+        drive.setPoseEstimate(startPose);
+
+
+        TrajectorySequence generalMovement = drive.trajectorySequenceBuilder(startPose) //Lines Up To Pole
+                .lineTo(new Vector2d(-36, -38))
+                .lineTo(new Vector2d(0, -38))
+                .build();
+
+        TrajectorySequence tag1Ending = drive.trajectorySequenceBuilder(new Pose2d(0, -38, Math.toRadians(90)))
+                .lineTo(new Vector2d(-60, -38))
+                .build();
+
+        TrajectorySequence tag2Ending = drive.trajectorySequenceBuilder(new Pose2d(0, -38, Math.toRadians(90)))
+                .lineTo(new Vector2d(-36, -38))
+                .build();
+
+        TrajectorySequence tag3Ending = drive.trajectorySequenceBuilder(new Pose2d(0, -38, Math.toRadians(90)))
+                .lineTo(new Vector2d(-12, -38))
+                .build();
+        TrajectorySequence failedAprilTag = drive.trajectorySequenceBuilder(new Pose2d(-36, -63, Math.toRadians(90)))
+                .lineTo(new Vector2d(-36, -38))
+                .build();
     }
 
     @Override
     public void init_loop() {
+        //ATag Detection
+        camera.setPipeline(aprilTagDetectionPipeline);
+        camera.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
+            @Override
+            public void onOpened() {
+                camera.startStreaming(800, 448, OpenCvCameraRotation.UPRIGHT);
+            }
+
+            @Override
+            public void onError(int errorCode) {
+                // does nothing if error
+            }
+        });
         super.init_loop();
     }
 
     @Override
     public void start() {
+        // Motors and Servos
+        frontleftDrive = hardwareMap.get(DcMotor.class, "front_left_drive");
+        frontrightDrive = hardwareMap.get(DcMotor.class, "front_right_drive");
+        backleftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
+        backrightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
+        middleslideDrive = hardwareMap.get(DcMotor.class, "middle_slides_drive");
+
+        rightgripperDrive = hardwareMap.get(Servo.class, "right_gripper_drive");
+        leftgripperDrive = hardwareMap.get(Servo.class, "left_gripper_drive");
+
+        frontleftDrive.setDirection(DcMotor.Direction.REVERSE);
+        frontrightDrive.setDirection(DcMotor.Direction.FORWARD);
+        backleftDrive.setDirection(DcMotor.Direction.REVERSE);
+        backrightDrive.setDirection(DcMotor.Direction.FORWARD);
+        middleslideDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        frontleftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        frontrightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        backleftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        backrightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        middleslideDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        frontleftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        frontrightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        backleftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        backrightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        middleslideDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        //imu
+        imu = hardwareMap.get(IMU.class, "imu");
+        IMU.Parameters myIMUparameters;
+
+        myIMUparameters = new IMU.Parameters(
+                new RevHubOrientationOnRobot(
+                        RevHubOrientationOnRobot.LogoFacingDirection.LEFT,
+                        RevHubOrientationOnRobot.UsbFacingDirection.UP
+                )
+        );
+
+
+        //Camera
+        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        OpenCvCamera camera = OpenCvCameraFactory.getInstance().createInternalCamera(OpenCvInternalCamera.CameraDirection.BACK, cameraMonitorViewId);
+        aprilTagDetectionPipeline = new AprilTagDetectionPipeline(tagSize, fx, fy, cx, cy);
+
+        telemetry.setMsTransmissionInterval(50);
+
+        SampleMecanumDrive drive = new SampleMecanumDrive(hardwareMap);
+
+        Pose2d startPose = new Pose2d(-36, -63, Math.toRadians(90));
+        drive.setPoseEstimate(startPose);
+
+
+        TrajectorySequence generalMovement = drive.trajectorySequenceBuilder(startPose) //Lines Up To Pole
+                .lineTo(new Vector2d(-36, -38))
+                .lineTo(new Vector2d(0, -38))
+                .build();
+
+        TrajectorySequence tag1Ending = drive.trajectorySequenceBuilder(new Pose2d(0, -38, Math.toRadians(90)))
+                .lineTo(new Vector2d(-60, -38))
+                .build();
+
+        TrajectorySequence tag2Ending = drive.trajectorySequenceBuilder(new Pose2d(0, -38, Math.toRadians(90)))
+                .lineTo(new Vector2d(-36, -38))
+                .build();
+
+        TrajectorySequence tag3Ending = drive.trajectorySequenceBuilder(new Pose2d(0, -38, Math.toRadians(90)))
+                .lineTo(new Vector2d(-12, -38))
+                .build();
+        TrajectorySequence failedAprilTag = drive.trajectorySequenceBuilder(new Pose2d(-36, -63, Math.toRadians(90)))
+                .lineTo(new Vector2d(-36, -38))
+                .build();
+
+        drive.followTrajectorySequenceAsync(generalMovement);
         super.start();
     }
 
     @Override
     public void loop() {
+        telemetry.setMsTransmissionInterval(50);
+
+        SampleMecanumDrive drive = new SampleMecanumDrive(hardwareMap);
+
+
+        drive.update();
 
     }
 
@@ -100,17 +267,13 @@ public class AutoTestJackLiam extends OpMode {
                 leftgripperDrive.setPosition(.505);
                 rightgripperDrive.setPosition(.35);
             }
-
         }
         if (position == 0) {
             while (leftgripperDrive.getPosition() != .77) {
                 leftgripperDrive.setPosition(.77);
                 rightgripperDrive.setPosition(.12);
             }
-
         }
-        sleep(sleep);
-
     }
 
     public void setSliderUp(double speed, double level,int sleep) {
@@ -134,7 +297,6 @@ public class AutoTestJackLiam extends OpMode {
             telemetry();
         }
         middleslideDrive.setPower(0);
-        sleep(sleep);
     }
     public void setSliderDown(double speed, double level,int sleep) {
         middleslideDrive = hardwareMap.get(DcMotor.class, "middle_slides_drive");
@@ -157,7 +319,6 @@ public class AutoTestJackLiam extends OpMode {
             telemetry();
         }
         middleslideDrive.setPower(0);
-        sleep(sleep);
     }
 
     public void placeCone() {
@@ -250,8 +411,6 @@ public class AutoTestJackLiam extends OpMode {
         frontrightDrive.setPower(0);
         backleftDrive.setPower(0);
         backrightDrive.setPower(0);
-
-        sleep(sleep);
     }
 
 
