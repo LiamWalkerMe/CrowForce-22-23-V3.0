@@ -35,8 +35,7 @@ public class TwentyPointAuto extends LinearOpMode {
     public DcMotor backleftDrive = null;
     public DcMotor backrightDrive = null;
     public DcMotor middleslideDrive = null;
-    public Servo rightgripperDrive = null;
-    public Servo leftgripperDrive = null;
+    public Servo gripperDrive = null;
 
 
     OpenCvCamera camera;
@@ -74,8 +73,7 @@ public class TwentyPointAuto extends LinearOpMode {
         backrightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
         middleSlideDrive = hardwareMap.get(DcMotor.class, "middle_slides_drive");
 
-        rightgripperDrive = hardwareMap.get(Servo.class, "right_gripper_drive");
-        leftgripperDrive = hardwareMap.get(Servo.class, "left_gripper_drive");
+        gripperDrive = hardwareMap.get(Servo.class, "gripper_drive");
 
         frontleftDrive.setDirection(DcMotor.Direction.REVERSE);
         frontrightDrive.setDirection(DcMotor.Direction.FORWARD);
@@ -231,12 +229,18 @@ public class TwentyPointAuto extends LinearOpMode {
     public void setServo(double position, int sleep) {
         position = position * 1;
         if (position == 1) {
-            while (leftgripperDrive.getPosition() != .505) {
-                leftgripperDrive.setPosition(.505);
-                rightgripperDrive.setPosition(.35);
+            while (gripperDrive.getPosition() != 0) {
+                gripperDrive.setPosition(0);
+
             }
 
         }
+        if (position == 0) {
+            while (gripperDrive.getPosition() != 0) {
+                gripperDrive.setPosition(.25);
+            }
+        }
+        sleep(sleep);
     }
     public void telemetry() {
         telemetry.addData("Run Time", runtime.toString());
