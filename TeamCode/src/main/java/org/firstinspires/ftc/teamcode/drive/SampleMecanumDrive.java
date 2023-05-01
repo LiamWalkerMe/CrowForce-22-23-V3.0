@@ -73,7 +73,7 @@ public class SampleMecanumDrive extends MecanumDrive {
     private TrajectoryFollower follower;
 
     private DcMotorEx leftFront, leftRear, rightRear, rightFront, middleSlides;
-    private Servo leftGripper, rightGripper;
+    private Servo gripper;
     private List<DcMotorEx> motors;
 
     private IMU imu;
@@ -107,8 +107,7 @@ public class SampleMecanumDrive extends MecanumDrive {
         rightRear = hardwareMap.get(DcMotorEx.class, "back_right_drive");
         rightFront = hardwareMap.get(DcMotorEx.class, "front_right_drive");
         middleSlides = hardwareMap.get(DcMotorEx.class, "middle_slides_drive");
-        rightGripper = hardwareMap.get(Servo.class, "right_gripper_drive");
-        leftGripper = hardwareMap.get(Servo.class, "left_gripper_drive");
+        gripper = hardwareMap.get(Servo.class, "gripper_drive");
 
         motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
 
@@ -308,16 +307,14 @@ public class SampleMecanumDrive extends MecanumDrive {
     public void setServo(double position) {
         position = position * 1;
         if (position == 1) {
-            while (leftGripper.getPosition() != .505) {
-                leftGripper.setPosition(.505);
-                rightGripper.setPosition(.35);
+            while (gripper.getPosition() != .505) {
+                gripper.setPosition(.505);
             }
 
         }
         if (position == 0) {
-            while (leftGripper.getPosition() != .77) {
-                leftGripper.setPosition(.77);
-                rightGripper.setPosition(.12);
+            while (gripper.getPosition() != .77) {
+                gripper.setPosition(.77);
             }
 
         }

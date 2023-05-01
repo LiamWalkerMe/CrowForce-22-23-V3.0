@@ -141,17 +141,12 @@ public class TeleopFieldCentric extends LinearOpMode {
             xPress1 = gamepad1.x;
 
             //slides code
-            if (dpad_up2 && middleslideDrive.getCurrentPosition() <= 5000) {
-
-                if (middleslideDrive.getCurrentPosition() <= 5000) {
-                    middleslideDrive.setPower(-1);
-                }
+            if (dpad_up2 && middleslideDrive.getCurrentPosition() <= 4700) {
+                    middleslideDrive.setPower(1);
             }
 
             if (dpad_down2 & middleslideDrive.getCurrentPosition() >= 0) {
-                if (middleslideDrive.getCurrentPosition() >= 0) {
-                    middleslideDrive.setPower(1);
-                }
+                    middleslideDrive.setPower(-1);
             }
 
             if (!dpad_down2 && !dpad_up2) {
@@ -170,7 +165,7 @@ public class TeleopFieldCentric extends LinearOpMode {
             if (yPress1) {power = 1; }
             else if (aPress1) { power = .3; }
 
-            power = (1/(distanceSensor.getDistance(DistanceUnit.CM)));
+            power = (1.0-1/(distanceSensor.getDistance(DistanceUnit.CM)));
 
             //Field Centric
             robotDegree = getAngle();
@@ -201,6 +196,7 @@ public class TeleopFieldCentric extends LinearOpMode {
 
         // Telemetry
         telemetry.addData("Run Time", runtime.toString());
+        telemetry.addData("Slide pos", middleslideDrive.getCurrentPosition());
         telemetry.addData("Distance Sensor", distanceSensor.getDistance(DistanceUnit.CM));
         telemetry.addData("gamepadXControl", gamepadXControl);
         telemetry.addData("gamepadYControl", gamepadYControl);
