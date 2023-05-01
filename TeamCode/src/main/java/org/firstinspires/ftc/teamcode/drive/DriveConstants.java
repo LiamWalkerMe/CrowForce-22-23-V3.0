@@ -16,7 +16,7 @@ import com.qualcomm.robotcore.hardware.PIDFCoefficients;
  * These are not the only parameters; some are located in the localizer classes, drive base classes,
  * and op modes themselves.
  */
-
+@Config
 public class DriveConstants {
 
     /*
@@ -86,7 +86,7 @@ public class DriveConstants {
      * You are free to raise this on your own if you would like. It is best determined through experimentation.
 
      */
-    public static double MAX_VEL = 20;
+    public static double MAX_VEL = 23.900119091935995;
     public static double MAX_ACCEL = 26.24145954165264;
     public static double MAX_ANG_VEL = Math.toRadians(158.26577684210528);
     public static double MAX_ANG_ACCEL = Math.toRadians(158.26577684210528);
