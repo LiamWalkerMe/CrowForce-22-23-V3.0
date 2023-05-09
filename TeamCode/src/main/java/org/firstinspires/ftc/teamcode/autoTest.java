@@ -11,9 +11,14 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 
+import org.apache.commons.math3.analysis.function.Max;
+import org.apache.commons.math3.util.FastMath;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
+import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
 import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequence;
 import org.openftc.apriltag.AprilTagDetection;
@@ -28,6 +33,7 @@ import java.util.ArrayList;
 
 public class autoTest extends LinearOpMode {
 
+    static int slideEpislon = 200;
     private final ElapsedTime runtime = new ElapsedTime();
     public DcMotor middleSlideDrive = null;
     private boolean hasRun = false;
@@ -35,7 +41,6 @@ public class autoTest extends LinearOpMode {
     public DcMotor frontrightDrive = null;
     public DcMotor backleftDrive = null;
     public DcMotor backrightDrive = null;
-    public DcMotor middleslideDrive = null;
     public Servo gripperDrive = null;
     public ColorSensor colorSensor = null;
     private DistanceSensor distanceSensor = null;
@@ -65,12 +70,38 @@ public class autoTest extends LinearOpMode {
     int tagOfInterest3 = 3; // Tag ID 3 from the 36h11 family
     public IMU imu;
 
-    AprilTagDetection tagOfInterest = null;
+    //State
+    public enum AutoRunState
+    {
+        STATE_BEGIN,
+        STATE_FIND_CONE,
+        STATE_ROTATE,
+        STATE_TO_CONE,
+        STATE_WAIT_FOR_LIFT,
+        STATE_DROP_CONE,
+        STATE_FINISH
+    };
+    AutoRunState currentState=AutoRunState.STATE_BEGIN;
+    AutoRunState nextState=AutoRunState.STATE_BEGIN;
 
+    public enum ClawState
+    {
+        STATE_CLAW_IDLE,
+        STATE_CLAW_CLOSE,
+        STATE_CLAW_MOVE,
+        STATE_CLAW_OPEN,
+        STATE_CLAW_CLOSE_AND_MOVE
+    };
+    ClawState currentClawState=ClawState.STATE_CLAW_IDLE;
+    int goalSlidePosition = 0;
+    double rotationalGoal = 0;
+    AprilTagDetection tagOfInterest = null;
+    private static ElapsedTime stopwatch = new ElapsedTime();
     @Override
     public void runOpMode() {
 
         initialize();
+
         drive = new SampleMecanumDrive(hardwareMap);
 
         /*Pose2d startPose = new Pose2d(-36, -63, Math.toRadians(90));
@@ -89,11 +120,11 @@ public class autoTest extends LinearOpMode {
         Pose2d startPose = new Pose2d(-60, -36, Math.toRadians(90));
         drive.setPoseEstimate(startPose);
         TrajectorySequence generalMovement = drive.trajectorySequenceBuilder(startPose) //Lines Up To Pole
-                .lineTo(new Vector2d(-30, -60))
-                .turn(Math.toRadians(90))
-                .build();
-        /*        .lineTo(new Vector2d(-60, -60))
-                .lineTo(new Vector2d(60, -60))
+                .lineTo(new Vector2d(-65, -36 ))
+
+                .lineTo(new Vector2d(-60, 50 ))
+                        .build();
+               /* .lineTo(new Vector2d(60, -60))
                 .turn(Math.toRadians(90))
                 .lineTo(new Vector2d(60, 60))
                 .turn(Math.toRadians(90))
@@ -105,17 +136,9 @@ public class autoTest extends LinearOpMode {
         telemetry.update();
         while (true) {
             mainLoop();
+            updateClaw();
         }
 
-    }
-    public void setServo(double position, int sleep) {
-        position = position * 1;
-        if (position == 1) {
-            while (gripperDrive.getPosition() != .505) {
-                gripperDrive.setPosition(.505);
-            }
-
-        }
     }
     public void telemetry() {
         telemetry.addData("Run Time", runtime.toString());
@@ -160,8 +183,8 @@ public class autoTest extends LinearOpMode {
         backrightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         middleSlideDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
-
-        //imu
+        stopwatch.reset();
+        //Set up IMU
         imu = hardwareMap.get(IMU.class, "imu");
         IMU.Parameters myIMUparameters;
 
@@ -172,19 +195,190 @@ public class autoTest extends LinearOpMode {
                 )
         );
 
+        // Wait for the game to start (driver presses PLAY)
+        imu.initialize(myIMUparameters);
+        imu.resetYaw();
+        SetSlidePosition(400);
+
         telemetry.setMsTransmissionInterval(50);
     }
 
-    public void mainLoop()
-    {
-        telemetry.addData("ColorTest:", colorTest() ? "Win" : "Fail");
-        if (!colorTest()) {
-            drive.update();
+    public void mainLoop() {
+        //telemetry.addData("ColorTest:", colorTest() ? "Win" : "Fail");
+        telemetry.addData("CurrentState", currentState);
+        telemetry.addData("time", stopwatch.time());
+        telemetry.addData("distance", distanceSensor.getDistance(DistanceUnit.CM));
+        YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
+
+        telemetry.addData("imu yaw:", ypr.getYaw(AngleUnit.DEGREES));
+        //telemetry.addData("imu pitch:", ypr.getPitch(AngleUnit.DEGREES));
+        //telemetry.addData("imu roll:", ypr.getRoll(AngleUnit.DEGREES));
+        //telemetry.addData("imu Orientation:", imu.getRobotOrientation(AxesReference.EXTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS).firstAngle);
+
+        switch (currentState) {
+            case STATE_BEGIN: {
+                if (drive.isBusy()) {
+                    drive.update();
+                } else {
+                    currentClawState = ClawState.STATE_CLAW_OPEN;
+                    currentState = AutoRunState.STATE_FIND_CONE;
+                }
+                break;
+            }
+            case STATE_FIND_CONE: {
+                if (distanceSensor.getDistance(DistanceUnit.CM) < 50) {
+                    frontleftDrive.setPower(-1);
+                    frontrightDrive.setPower(-1);
+                    backleftDrive.setPower(-1);
+                    backrightDrive.setPower(-1);
+                    RequestRotation(90, AutoRunState.STATE_TO_CONE);
+                } else {
+                    double searchPower = 0.4;
+                    frontleftDrive.setPower(searchPower);
+                    frontrightDrive.setPower(searchPower);
+                    backleftDrive.setPower(searchPower);
+                    backrightDrive.setPower(searchPower);
+                }
+                break;
+            }
+            case STATE_ROTATE: {
+                double yaw = ypr.getYaw(AngleUnit.DEGREES);
+                double turnError = (1.0-Math.abs(yaw/rotationalGoal));
+                double turnPower = Math.copySign(FastMath.min(1.0, turnError)*0.9, rotationalGoal);
+                turnPower = Math.copySign(FastMath.max(0.05, Math.abs(turnPower)), turnPower);
+                turnPower = Math.copySign(1.0, turnError)*turnPower;
+                telemetry.addData("Turn Power:", turnPower);
+                if (Math.abs(turnError)<0.02)
+                {
+                    currentState = nextState;
+                    stopwatch.reset();
+                }
+                else
+                {
+                    frontleftDrive.setPower(-turnPower);
+                    frontrightDrive.setPower(turnPower);
+                    backleftDrive.setPower(-turnPower);
+                    backrightDrive.setPower(turnPower);
+                }
+                break;
+            }
+            case STATE_TO_CONE: {
+                if (stopwatch.time() > 0.55) {
+                    frontleftDrive.setPower(0);
+                    frontrightDrive.setPower(0);
+                    backleftDrive.setPower(0);
+                    backrightDrive.setPower(0);
+                    SetSlidePosition(1200);
+                    currentClawState = ClawState.STATE_CLAW_CLOSE_AND_MOVE;
+                    currentState = AutoRunState.STATE_WAIT_FOR_LIFT;
+                } else {
+                    double searchPower = 0.4;
+                    frontleftDrive.setPower(searchPower);
+                    frontrightDrive.setPower(searchPower);
+                    backleftDrive.setPower(searchPower);
+                    backrightDrive.setPower(searchPower);
+                }
+                break;
+            }
+            case STATE_WAIT_FOR_LIFT: {
+                if (currentClawState == ClawState.STATE_CLAW_IDLE) {
+
+                    RequestRotation(-45, AutoRunState.STATE_DROP_CONE);
+                }
+                break;
+            }
+            case STATE_DROP_CONE: {
+                currentClawState = ClawState.STATE_CLAW_OPEN;
+                RequestRotation(-45, AutoRunState.STATE_FINISH);
+            }
+            case STATE_FINISH: {
+                frontleftDrive.setPower(0);
+                frontrightDrive.setPower(0);
+                backleftDrive.setPower(0);
+                backrightDrive.setPower(0);
+                //SetSlidePosition(0);
+                break;
+            }
         }
         telemetry.update();
     }
 
-    public boolean colorTest ()
+    public void updateClaw() {
+        telemetry.addData("CurrentClawState", currentClawState);
+        telemetry.addData("Gripper Position", gripperDrive.getPosition());
+        telemetry.addData("SlidePosition", middleSlideDrive.getCurrentPosition());
+
+        switch (currentClawState) {
+            case STATE_CLAW_OPEN: {
+                gripperDrive.setPosition(0.25);
+                currentClawState = ClawState.STATE_CLAW_IDLE;
+                break;
+            }
+            case STATE_CLAW_CLOSE: {
+                gripperDrive.setPosition(0.0);
+                currentClawState = ClawState.STATE_CLAW_IDLE;
+                break;
+            }
+            case STATE_CLAW_MOVE: {
+                telemetry.addData("Slide GOAL", goalSlidePosition);
+                if (Math.abs(middleSlideDrive.getCurrentPosition()-goalSlidePosition) < slideEpislon)
+                {
+                    currentClawState = ClawState.STATE_CLAW_IDLE;
+                    middleSlideDrive.setPower(0);
+                }
+                else if (middleSlideDrive.getCurrentPosition() <= goalSlidePosition) {
+                    middleSlideDrive.setPower(0.2);
+                }
+                else {
+                    middleSlideDrive.setPower(-0.2);
+                }
+                break;
+            }
+            case STATE_CLAW_CLOSE_AND_MOVE: {
+                telemetry.addData("Slide GOAL", goalSlidePosition);
+                gripperDrive.setPosition(0.0);
+                if (gripperDrive.getPosition() == 0.0) {
+                    if (Math.abs(middleSlideDrive.getCurrentPosition()-goalSlidePosition) < slideEpislon)
+                    {
+                        currentClawState = ClawState.STATE_CLAW_IDLE;
+                        middleSlideDrive.setPower(0);
+                    }
+                    else if (middleSlideDrive.getCurrentPosition() <= goalSlidePosition) {
+                        middleSlideDrive.setPower(0.2);
+                    }
+                    else {
+                        middleSlideDrive.setPower(-0.2);
+                    }
+                }
+
+                break;
+            }
+            case STATE_CLAW_IDLE: {
+                break;
+            }
+        }
+    }
+
+    public void SetSlidePosition(int position)
+    {
+        if (position!=goalSlidePosition) {
+            goalSlidePosition = position;
+            currentClawState = ClawState.STATE_CLAW_MOVE;
+        }
+    }
+    public void RequestRotation(double angle, AutoRunState stateNext)
+    {
+       // YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
+        imu.resetYaw();
+        nextState = stateNext;
+        rotationalGoal = angle;// - ypr.getYaw(AngleUnit.DEGREES);
+        currentState = AutoRunState.STATE_ROTATE;
+        if (rotationalGoal == 0) {
+            rotationalGoal = 1;
+        }
+    }
+
+    /*public boolean colorTest ()
     {
         telemetry.addData("colorSensor alpha", colorSensor.alpha());
         telemetry.addData("colorSensor blue", colorSensor.blue());
@@ -194,5 +388,5 @@ public class autoTest extends LinearOpMode {
             return true;
         }
         return false;
-    }
+    }*/
 }
