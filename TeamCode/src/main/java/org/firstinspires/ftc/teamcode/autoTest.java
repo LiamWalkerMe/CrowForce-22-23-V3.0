@@ -2,11 +2,14 @@ package org.firstinspires.ftc.teamcode;
 
 import com.acmerobotics.roadrunner.geometry.Pose2d;
 import com.acmerobotics.roadrunner.geometry.Vector2d;
+import com.qualcomm.ftccommon.SoundPlayer;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
+import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.hardware.ColorSensor;
@@ -32,8 +35,9 @@ import java.util.ArrayList;
 @com.qualcomm.robotcore.eventloop.opmode.Autonomous(name = "autoTest", group = "OpenCV Autos" )
 
 public class autoTest extends LinearOpMode {
-
+    static double gripperChangeTime = 1;
     static int slideEpislon = 200;
+    static double floatEpislon = 0.03;
     private final ElapsedTime runtime = new ElapsedTime();
     public DcMotor middleSlideDrive = null;
     private boolean hasRun = false;
@@ -42,8 +46,18 @@ public class autoTest extends LinearOpMode {
     public DcMotor backleftDrive = null;
     public DcMotor backrightDrive = null;
     public Servo gripperDrive = null;
-    public ColorSensor colorSensor = null;
+    public NormalizedColorSensor colorSensor = null;
+
     private DistanceSensor distanceSensor = null;
+
+
+    //Sound resources
+    int silverSoundID = 0;
+    int goldSoundID = 0;
+
+    //State progress markers
+    boolean SubStateInitialized = false;
+    boolean SubStateStarted = false;
 
     SampleMecanumDrive drive;
     OpenCvCamera camera;
@@ -79,6 +93,7 @@ public class autoTest extends LinearOpMode {
         STATE_TO_CONE,
         STATE_WAIT_FOR_LIFT,
         STATE_DROP_CONE,
+        STATE_DRIVE_TO_COLOR,
         STATE_FINISH
     };
     AutoRunState currentState=AutoRunState.STATE_BEGIN;
@@ -88,15 +103,22 @@ public class autoTest extends LinearOpMode {
     {
         STATE_CLAW_IDLE,
         STATE_CLAW_CLOSE,
-        STATE_CLAW_MOVE,
         STATE_CLAW_OPEN,
-        STATE_CLAW_CLOSE_AND_MOVE
     };
     ClawState currentClawState=ClawState.STATE_CLAW_IDLE;
+
+    public enum SlideState
+    {
+        STATE_SLIDE_IDLE,
+        STATE_SLIDE_MOVE
+    }
+    SlideState currentSlideState=SlideState.STATE_SLIDE_IDLE;
+
     int goalSlidePosition = 0;
     double rotationalGoal = 0;
     AprilTagDetection tagOfInterest = null;
     private static ElapsedTime stopwatch = new ElapsedTime();
+    private static ElapsedTime gripperwatch = new ElapsedTime();
     @Override
     public void runOpMode() {
 
@@ -132,11 +154,15 @@ public class autoTest extends LinearOpMode {
                 .build(); */
         drive.followTrajectorySequenceAsync(generalMovement);
 
+        waitForStart();
+
         telemetry.addData("Status", "BEGIN");
         telemetry.update();
-        while (true) {
+        currentState=AutoRunState.STATE_BEGIN;
+        while (currentState != AutoRunState.STATE_FINISH) {
             mainLoop();
             updateClaw();
+            updateSlide();
         }
 
     }
@@ -161,7 +187,9 @@ public class autoTest extends LinearOpMode {
 
         gripperDrive = hardwareMap.get(Servo.class, "gripper_drive");
         //sensors
-        colorSensor = hardwareMap.get(ColorSensor.class, "colorSensor");
+        colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
+        colorSensor.setGain(15.0f);
+
         distanceSensor = hardwareMap.get(DistanceSensor.class, "distanceSensor");
 
 
@@ -183,7 +211,12 @@ public class autoTest extends LinearOpMode {
         backrightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         middleSlideDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
+        // Sound resources (see SoundTest.java)
+        silverSoundID = hardwareMap.appContext.getResources().getIdentifier("silver", "raw", hardwareMap.appContext.getPackageName());
+        goldSoundID   = hardwareMap.appContext.getResources().getIdentifier("gold",   "raw", hardwareMap.appContext.getPackageName());
+
         stopwatch.reset();
+        gripperwatch.reset();
         //Set up IMU
         imu = hardwareMap.get(IMU.class, "imu");
         IMU.Parameters myIMUparameters;
@@ -248,8 +281,12 @@ public class autoTest extends LinearOpMode {
                 turnPower = Math.copySign(FastMath.max(0.05, Math.abs(turnPower)), turnPower);
                 turnPower = Math.copySign(1.0, turnError)*turnPower;
                 telemetry.addData("Turn Power:", turnPower);
-                if (Math.abs(turnError)<0.02)
+                if (Math.abs(turnError)<floatEpislon)
                 {
+                    frontleftDrive.setPower(0);
+                    frontrightDrive.setPower(0);
+                    backleftDrive.setPower(0);
+                    backrightDrive.setPower(0);
                     currentState = nextState;
                     stopwatch.reset();
                 }
@@ -263,13 +300,12 @@ public class autoTest extends LinearOpMode {
                 break;
             }
             case STATE_TO_CONE: {
-                if (stopwatch.time() > 0.55) {
+                if (stopwatch.time() > 0.7) {
                     frontleftDrive.setPower(0);
                     frontrightDrive.setPower(0);
                     backleftDrive.setPower(0);
                     backrightDrive.setPower(0);
-                    SetSlidePosition(1200);
-                    currentClawState = ClawState.STATE_CLAW_CLOSE_AND_MOVE;
+                    currentClawState = currentClawState.STATE_CLAW_CLOSE;
                     currentState = AutoRunState.STATE_WAIT_FOR_LIFT;
                 } else {
                     double searchPower = 0.4;
@@ -282,15 +318,51 @@ public class autoTest extends LinearOpMode {
             }
             case STATE_WAIT_FOR_LIFT: {
                 if (currentClawState == ClawState.STATE_CLAW_IDLE) {
-
+                    SetSlidePosition(1200);
+                }
+                if (currentClawState == ClawState.STATE_CLAW_IDLE && currentSlideState == SlideState.STATE_SLIDE_IDLE) {
                     RequestRotation(-45, AutoRunState.STATE_DROP_CONE);
+
                 }
                 break;
             }
             case STATE_DROP_CONE: {
-                currentClawState = ClawState.STATE_CLAW_OPEN;
-                RequestRotation(-45, AutoRunState.STATE_FINISH);
+                if (!SubStateInitialized)
+                {
+                    SubStateInitialized = true;
+                    SetSlidePosition(100);
+                }
+                if (currentSlideState == SlideState.STATE_SLIDE_IDLE && !SubStateStarted) {
+                    currentClawState = ClawState.STATE_CLAW_OPEN;
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, goldSoundID);
+                    SubStateStarted = true;
+                }
+                if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
+                    SetSlidePosition(780);
+                    if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
+                        RequestRotation(-45, AutoRunState.STATE_DRIVE_TO_COLOR);
+                        SubStateInitialized=false;
+                        SubStateStarted=false;
+                    }
+                }
+                break;
             }
+            case STATE_DRIVE_TO_COLOR:
+            {
+                if (colorTest())
+                {
+                    RequestRotation(90, AutoRunState.STATE_FINISH);
+                } else {
+                    double searchPower = 0.4;
+                    frontleftDrive.setPower(searchPower);
+                    frontrightDrive.setPower(searchPower);
+                    backleftDrive.setPower(searchPower);
+                    backrightDrive.setPower(searchPower);
+                }
+
+                break;
+            }
+
             case STATE_FINISH: {
                 frontleftDrive.setPower(0);
                 frontrightDrive.setPower(0);
@@ -306,51 +378,31 @@ public class autoTest extends LinearOpMode {
     public void updateClaw() {
         telemetry.addData("CurrentClawState", currentClawState);
         telemetry.addData("Gripper Position", gripperDrive.getPosition());
-        telemetry.addData("SlidePosition", middleSlideDrive.getCurrentPosition());
+        telemetry.addData("Gripper time", gripperwatch.time());
+
 
         switch (currentClawState) {
             case STATE_CLAW_OPEN: {
-                gripperDrive.setPosition(0.25);
-                currentClawState = ClawState.STATE_CLAW_IDLE;
+                if (Math.abs(gripperDrive.getPosition() - 0.25)>floatEpislon) {
+                    gripperDrive.setPosition(0.25);
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
+                    gripperwatch.reset();
+                }
+                if (gripperwatch.time() > gripperChangeTime)
+                {
+                    currentClawState = ClawState.STATE_CLAW_IDLE;
+                }
                 break;
             }
             case STATE_CLAW_CLOSE: {
-                gripperDrive.setPosition(0.0);
-                currentClawState = ClawState.STATE_CLAW_IDLE;
-                break;
-            }
-            case STATE_CLAW_MOVE: {
-                telemetry.addData("Slide GOAL", goalSlidePosition);
-                if (Math.abs(middleSlideDrive.getCurrentPosition()-goalSlidePosition) < slideEpislon)
-                {
+                if (Math.abs(gripperDrive.getPosition() )>floatEpislon) {
+                    gripperDrive.setPosition(0.0);
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, goldSoundID);
+                    gripperwatch.reset();
+                }
+                if (gripperwatch.time() > gripperChangeTime) {
                     currentClawState = ClawState.STATE_CLAW_IDLE;
-                    middleSlideDrive.setPower(0);
                 }
-                else if (middleSlideDrive.getCurrentPosition() <= goalSlidePosition) {
-                    middleSlideDrive.setPower(0.2);
-                }
-                else {
-                    middleSlideDrive.setPower(-0.2);
-                }
-                break;
-            }
-            case STATE_CLAW_CLOSE_AND_MOVE: {
-                telemetry.addData("Slide GOAL", goalSlidePosition);
-                gripperDrive.setPosition(0.0);
-                if (gripperDrive.getPosition() == 0.0) {
-                    if (Math.abs(middleSlideDrive.getCurrentPosition()-goalSlidePosition) < slideEpislon)
-                    {
-                        currentClawState = ClawState.STATE_CLAW_IDLE;
-                        middleSlideDrive.setPower(0);
-                    }
-                    else if (middleSlideDrive.getCurrentPosition() <= goalSlidePosition) {
-                        middleSlideDrive.setPower(0.2);
-                    }
-                    else {
-                        middleSlideDrive.setPower(-0.2);
-                    }
-                }
-
                 break;
             }
             case STATE_CLAW_IDLE: {
@@ -358,12 +410,40 @@ public class autoTest extends LinearOpMode {
             }
         }
     }
+    public void updateSlide() {
+        telemetry.addData("CurrentSlideState", currentSlideState);
+        telemetry.addData("SlidePosition", middleSlideDrive.getCurrentPosition());
+
+        switch (currentSlideState) {
+
+            case STATE_SLIDE_MOVE: {
+                telemetry.addData("Slide GOAL", goalSlidePosition);
+                if (Math.abs(middleSlideDrive.getCurrentPosition()-goalSlidePosition) < slideEpislon)
+                {
+                    currentSlideState = SlideState.STATE_SLIDE_IDLE;
+                    middleSlideDrive.setPower(0);
+                }
+                else if (middleSlideDrive.getCurrentPosition() <= goalSlidePosition) {
+                    middleSlideDrive.setPower(0.3);
+                }
+                else {
+                    middleSlideDrive.setPower(-0.3);
+                }
+                break;
+            }
+
+            case STATE_SLIDE_IDLE: {
+                break;
+            }
+        }
+    }
+
 
     public void SetSlidePosition(int position)
     {
         if (position!=goalSlidePosition) {
             goalSlidePosition = position;
-            currentClawState = ClawState.STATE_CLAW_MOVE;
+            currentSlideState = currentSlideState.STATE_SLIDE_MOVE;
         }
     }
     public void RequestRotation(double angle, AutoRunState stateNext)
@@ -378,15 +458,18 @@ public class autoTest extends LinearOpMode {
         }
     }
 
-    /*public boolean colorTest ()
+    public boolean colorTest ()
     {
-        telemetry.addData("colorSensor alpha", colorSensor.alpha());
-        telemetry.addData("colorSensor blue", colorSensor.blue());
+        NormalizedRGBA colors = colorSensor.getNormalizedColors();
+        telemetry.addData("colorSensor alpha", colors.alpha);
+        telemetry.addData("colorSensor blue", colors.blue);
+        telemetry.addData("colorSensor red", colors.red);
+        telemetry.addData("colorDistance", ((DistanceSensor) colorSensor).getDistance(DistanceUnit.CM));
 
-        if (colorSensor.alpha() > 200)
+        if (colors.blue > 0.015f)
         {
             return true;
         }
         return false;
-    }*/
+    }
 }
