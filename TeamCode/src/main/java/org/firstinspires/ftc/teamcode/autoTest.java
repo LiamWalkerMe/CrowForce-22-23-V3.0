@@ -94,6 +94,7 @@ public class autoTest extends LinearOpMode {
         STATE_WAIT_FOR_LIFT,
         STATE_DROP_CONE,
         STATE_DRIVE_TO_COLOR,
+        STATE_MOVE,
         STATE_FINISH
     };
     AutoRunState currentState=AutoRunState.STATE_BEGIN;
@@ -115,7 +116,10 @@ public class autoTest extends LinearOpMode {
     SlideState currentSlideState=SlideState.STATE_SLIDE_IDLE;
 
     int goalSlidePosition = 0;
-    double rotationalGoal = 0;
+    double currentRotationalGoal = 0;
+    double prevRotationalGoal = 0;
+    double totalRotationCorrection=0;
+
     AprilTagDetection tagOfInterest = null;
     private static ElapsedTime stopwatch = new ElapsedTime();
     private static ElapsedTime gripperwatch = new ElapsedTime();
@@ -276,10 +280,13 @@ public class autoTest extends LinearOpMode {
             }
             case STATE_ROTATE: {
                 double yaw = ypr.getYaw(AngleUnit.DEGREES);
-                double turnError = (1.0-Math.abs(yaw/rotationalGoal));
-                double turnPower = Math.copySign(FastMath.min(1.0, turnError)*0.9, rotationalGoal);
-                turnPower = Math.copySign(FastMath.max(0.05, Math.abs(turnPower)), turnPower);
-                turnPower = Math.copySign(1.0, turnError)*turnPower;
+                double turnError = currentRotationalGoal-yaw;
+                double turnT = turnError/totalRotationCorrection;
+                double turnPower = FastMath.min(1.0, turnT)*0.9;
+                turnPower = Math.copySign(FastMath.max(0.05, Math.abs(turnPower)), totalRotationCorrection);
+                turnPower = Math.copySign(1.0, turnT)*turnPower;
+                telemetry.addData("Turn Error:", turnError);
+                telemetry.addData("Turn T:", turnT);
                 telemetry.addData("Turn Power:", turnPower);
                 if (Math.abs(turnError)<floatEpislon)
                 {
@@ -300,7 +307,7 @@ public class autoTest extends LinearOpMode {
                 break;
             }
             case STATE_TO_CONE: {
-                if (stopwatch.time() > 0.7) {
+                if (stopwatch.time() > 0.5) {
                     frontleftDrive.setPower(0);
                     frontrightDrive.setPower(0);
                     backleftDrive.setPower(0);
@@ -321,7 +328,7 @@ public class autoTest extends LinearOpMode {
                     SetSlidePosition(1200);
                 }
                 if (currentClawState == ClawState.STATE_CLAW_IDLE && currentSlideState == SlideState.STATE_SLIDE_IDLE) {
-                    RequestRotation(-45, AutoRunState.STATE_DROP_CONE);
+                    RequestRotation(45, AutoRunState.STATE_DROP_CONE);
 
                 }
                 break;
@@ -340,7 +347,7 @@ public class autoTest extends LinearOpMode {
                 if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
                     SetSlidePosition(780);
                     if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
-                        RequestRotation(-45, AutoRunState.STATE_DRIVE_TO_COLOR);
+                        RequestRotation(-135, AutoRunState.STATE_DRIVE_TO_COLOR);
                         SubStateInitialized=false;
                         SubStateStarted=false;
                     }
@@ -351,7 +358,7 @@ public class autoTest extends LinearOpMode {
             {
                 if (colorTest())
                 {
-                    RequestRotation(90, AutoRunState.STATE_FINISH);
+                    RequestRotation(90, AutoRunState.STATE_MOVE);
                 } else {
                     double searchPower = 0.4;
                     frontleftDrive.setPower(searchPower);
@@ -360,6 +367,24 @@ public class autoTest extends LinearOpMode {
                     backrightDrive.setPower(searchPower);
                 }
 
+                break;
+            }
+            case STATE_MOVE: {
+                if (!SubStateInitialized)
+                {
+                    SubStateInitialized = true;
+                    stopwatch.reset();
+                }
+                if (stopwatch.time() < 1.2) {
+                    double searchPower = 0.4;
+                    frontleftDrive.setPower(searchPower);
+                    frontrightDrive.setPower(searchPower);
+                    backleftDrive.setPower(searchPower);
+                    backrightDrive.setPower(searchPower);
+                } else {
+                    SubStateInitialized = false;
+                    currentState = AutoRunState.STATE_FINISH;
+                }
                 break;
             }
 
@@ -449,13 +474,20 @@ public class autoTest extends LinearOpMode {
     public void RequestRotation(double angle, AutoRunState stateNext)
     {
        // YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
-        imu.resetYaw();
+        //imu.resetYaw();
+        //rotationalGoal += angle;// - ypr.getYaw(AngleUnit.DEGREES);
+        //if (rotationalGoal == 0) {
+        //    rotationalGoal = 1;
+        //}
+
+        YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
+        prevRotationalGoal = currentRotationalGoal;
+        currentRotationalGoal += angle;
+        totalRotationCorrection = (currentRotationalGoal - ypr.getYaw(AngleUnit.DEGREES));
+        if (Math.abs(totalRotationCorrection)<0.01 )
+            return;
         nextState = stateNext;
-        rotationalGoal = angle;// - ypr.getYaw(AngleUnit.DEGREES);
         currentState = AutoRunState.STATE_ROTATE;
-        if (rotationalGoal == 0) {
-            rotationalGoal = 1;
-        }
     }
 
     public boolean colorTest ()
