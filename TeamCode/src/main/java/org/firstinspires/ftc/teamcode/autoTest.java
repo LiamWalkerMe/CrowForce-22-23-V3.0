@@ -242,6 +242,7 @@ public class autoTest extends LinearOpMode {
 
     public void mainLoop() {
         //telemetry.addData("ColorTest:", colorTest() ? "Win" : "Fail");
+        
         telemetry.addData("CurrentState", currentState);
         telemetry.addData("time", stopwatch.time());
         telemetry.addData("distance", distanceSensor.getDistance(DistanceUnit.CM));
