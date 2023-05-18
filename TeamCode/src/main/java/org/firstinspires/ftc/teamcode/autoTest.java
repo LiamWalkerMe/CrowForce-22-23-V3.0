@@ -47,7 +47,7 @@ public class autoTest extends LinearOpMode {
     public DcMotor backrightDrive = null;
     public Servo gripperDrive = null;
     public NormalizedColorSensor colorSensor = null;
-
+    private DistanceSensor distanceSensorTwo = null;
     private DistanceSensor distanceSensor = null;
 
 
@@ -193,7 +193,7 @@ public class autoTest extends LinearOpMode {
         //sensors
         colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
         colorSensor.setGain(15.0f);
-
+        distanceSensorTwo = hardwareMap.get(DistanceSensor.class, "distanceSensor");
         distanceSensor = hardwareMap.get(DistanceSensor.class, "distanceSensor");
 
 
@@ -242,11 +242,11 @@ public class autoTest extends LinearOpMode {
 
     public void mainLoop() {
         //telemetry.addData("ColorTest:", colorTest() ? "Win" : "Fail");
-        
         telemetry.addData("CurrentState", currentState);
         telemetry.addData("time", stopwatch.time());
         telemetry.addData("distance", distanceSensor.getDistance(DistanceUnit.CM));
         YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
+        telemetry.addData("distance", distanceSensorTwo.getDistance(DistanceUnit.CM));
 
         telemetry.addData("imu yaw:", ypr.getYaw(AngleUnit.DEGREES));
         //telemetry.addData("imu pitch:", ypr.getPitch(AngleUnit.DEGREES));
@@ -499,10 +499,15 @@ public class autoTest extends LinearOpMode {
         telemetry.addData("colorSensor red", colors.red);
         telemetry.addData("colorDistance", ((DistanceSensor) colorSensor).getDistance(DistanceUnit.CM));
 
-        if (colors.blue > 0.015f)
+        if (colors.blue > 0.011f)
         {
             return true;
         }
         return false;
+        /*if (colors.blue > 0.0125f)
+        {
+            return true;
+        }
+        return false;*/
     }
 }

@@ -100,8 +100,8 @@ public class TwentyPointAuto extends LinearOpMode {
         IMU.Parameters myIMUparameters;
 
         myIMUparameters = new IMU.Parameters(
-                new RevHubOrientationOnRobot(
-                        RevHubOrientationOnRobot.LogoFacingDirection.LEFT,
+                        new RevHubOrientationOnRobot(
+                                RevHubOrientationOnRobot.LogoFacingDirection.LEFT,
                         RevHubOrientationOnRobot.UsbFacingDirection.UP
                 )
         );

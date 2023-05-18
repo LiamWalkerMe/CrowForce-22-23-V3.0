@@ -33,8 +33,6 @@ public class TwentyFivePointAutoLeft extends LinearOpMode {
     public DcMotor frontrightDrive = null;
     public DcMotor backleftDrive = null;
     public DcMotor backrightDrive = null;
-    public Servo rightgripperDrive = null;
-    public Servo leftgripperDrive = null;
 
 
     OpenCvCamera camera;
@@ -70,9 +68,6 @@ public class TwentyFivePointAutoLeft extends LinearOpMode {
         backleftDrive = hardwareMap.get(DcMotor.class, "back_left_drive");
         backrightDrive = hardwareMap.get(DcMotor.class, "back_right_drive");
         middleslideDrive = hardwareMap.get(DcMotor.class, "middle_slides_drive");
-
-        rightgripperDrive = hardwareMap.get(Servo.class, "right_gripper_drive");
-        leftgripperDrive = hardwareMap.get(Servo.class, "left_gripper_drive");
 
         frontleftDrive.setDirection(DcMotor.Direction.REVERSE);
         frontrightDrive.setDirection(DcMotor.Direction.FORWARD);
@@ -259,26 +254,6 @@ public class TwentyFivePointAutoLeft extends LinearOpMode {
         telemetry.addLine(String.format("Rotation Roll: %.2f degrees", Math.toDegrees(detection.pose.roll)));
     }
 
-    public void setServo(double position, int sleep) {
-        position = position * 1;
-        if (position == 1) {
-            while (leftgripperDrive.getPosition() != .505) {
-                leftgripperDrive.setPosition(.505);
-                rightgripperDrive.setPosition(.35);
-            }
-
-        }
-        if (position == 0) {
-            while (leftgripperDrive.getPosition() != .77) {
-                leftgripperDrive.setPosition(.77);
-                rightgripperDrive.setPosition(.12);
-            }
-
-        }
-        sleep(sleep);
-
-    }
-
     public void setSliderUp(double speed, double level,int sleep) {
         middleslideDrive = hardwareMap.get(DcMotor.class, "middle_slides_drive");
         boolean finished = false;
@@ -329,7 +304,6 @@ public class TwentyFivePointAutoLeft extends LinearOpMode {
     public void placeCone() {
         setSliderDown(.5,0,500);
         moveSimpleEncoder(.5,100,1,100);
-        setServo(0,500);
         setSliderDown(.5,0,500);
         moveSimpleEncoder(.5,100,3,100);
 
