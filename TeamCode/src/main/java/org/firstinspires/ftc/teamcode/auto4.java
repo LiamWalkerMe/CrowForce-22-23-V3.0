@@ -32,12 +32,15 @@ import org.openftc.easyopencv.OpenCvInternalCamera;
 
 import java.util.ArrayList;
 
-@com.qualcomm.robotcore.eventloop.opmode.Autonomous(name = "autoTest", group = "OpenCV Autos" )
+@com.qualcomm.robotcore.eventloop.opmode.Autonomous(name = "auto4", group = "tournament Autos" )
 
-public class autoTest extends LinearOpMode {
-    static double gripperChangeTime = 1;
-    static int slideEpislon = 200;
-    static double floatEpislon = 0.03;
+public class auto4 extends LinearOpMode {
+    final double gripperChangeTime = 1;
+    final int slideEpislon = 200;
+    final double floatEpislon = 0.03;
+    final double rotationalEpsilon = 0.04;
+    static double dancePower = -0.4;
+    static int danceRepeats = 0;
     private final ElapsedTime runtime = new ElapsedTime();
     public DcMotor middleSlideDrive = null;
     private boolean hasRun = false;
@@ -92,6 +95,7 @@ public class autoTest extends LinearOpMode {
         STATE_ROTATE,
         STATE_TO_CONE,
         STATE_WAIT_FOR_LIFT,
+        STATE_DANCE,
         STATE_DROP_CONE,
         STATE_DRIVE_TO_COLOR,
         STATE_MOVE,
@@ -146,10 +150,9 @@ public class autoTest extends LinearOpMode {
         Pose2d startPose = new Pose2d(-60, -36, Math.toRadians(90));
         drive.setPoseEstimate(startPose);
         TrajectorySequence generalMovement = drive.trajectorySequenceBuilder(startPose) //Lines Up To Pole
-                .lineTo(new Vector2d(-65, -36 ))
 
-                .lineTo(new Vector2d(-60, 50 ))
-                        .build();
+                .lineTo(new Vector2d(-60, 40 ))
+                .build();
                /* .lineTo(new Vector2d(60, -60))
                 .turn(Math.toRadians(90))
                 .lineTo(new Vector2d(60, 60))
@@ -250,6 +253,7 @@ public class autoTest extends LinearOpMode {
         telemetry();
         switch (currentState) {
             case STATE_BEGIN: {
+
                 if (drive.isBusy()) {
                     drive.update();
                 } else {
@@ -260,13 +264,14 @@ public class autoTest extends LinearOpMode {
             }
             case STATE_FIND_CONE: {
                 if (distanceSensor.getDistance(DistanceUnit.CM) < 50) {
-                    frontleftDrive.setPower(-1);
-                    frontrightDrive.setPower(-1);
-                    backleftDrive.setPower(-1);
-                    backrightDrive.setPower(-1);
+                   // SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, goldSoundID);
+                    frontleftDrive.setPower(0);
+                    frontrightDrive.setPower(0);
+                    backleftDrive.setPower(0);
+                    backrightDrive.setPower(0);
                     RequestRotation(90, AutoRunState.STATE_TO_CONE);
                 } else {
-                    double searchPower = 0.45;
+                    double searchPower = 0.4;
                     frontleftDrive.setPower(searchPower);
                     frontrightDrive.setPower(searchPower);
                     backleftDrive.setPower(searchPower);
@@ -279,13 +284,13 @@ public class autoTest extends LinearOpMode {
                 double yaw = ypr.getYaw(AngleUnit.DEGREES);
                 double turnError = currentRotationalGoal-yaw;
                 double turnT = turnError/totalRotationCorrection;
-                double turnPower = FastMath.min(1.0, turnT)*0.9;
+                double turnPower = FastMath.min(1.0, turnT)*1.0;
                 turnPower = Math.copySign(FastMath.max(0.05, Math.abs(turnPower)), totalRotationCorrection);
                 turnPower = Math.copySign(1.0, turnT)*turnPower;
                 telemetry.addData("Turn Error:", turnError);
                 telemetry.addData("Turn T:", turnT);
                 telemetry.addData("Turn Power:", turnPower);
-                if (Math.abs(turnError)<floatEpislon)
+                if (Math.abs(turnError)<rotationalEpsilon)
                 {
                     frontleftDrive.setPower(0);
                     frontrightDrive.setPower(0);
@@ -323,10 +328,47 @@ public class autoTest extends LinearOpMode {
             case STATE_WAIT_FOR_LIFT: {
                 if (currentClawState == ClawState.STATE_CLAW_IDLE) {
                     SetSlidePosition(1200);
+                    /*stopwatch.reset();
+                    if (stopwatch.time() < 0.2) {
+                        double searchPower = 0.2;
+                        frontleftDrive.setPower(-searchPower);
+                        frontrightDrive.setPower(-searchPower);
+                        backleftDrive.setPower(-searchPower);
+                        backrightDrive.setPower(-searchPower);
+                    }*/
                 }
                 if (currentClawState == ClawState.STATE_CLAW_IDLE && currentSlideState == SlideState.STATE_SLIDE_IDLE) {
-                    RequestRotation(45, AutoRunState.STATE_DROP_CONE);
+                   currentState = AutoRunState.STATE_DANCE;
 
+                }
+                break;
+            }
+            case STATE_DANCE: {
+                if (danceRepeats == 5) {
+                 currentState = AutoRunState.STATE_DROP_CONE;
+                 SubStateInitialized = false;
+                    double searchPower = 0.0;
+                    frontleftDrive.setPower(searchPower);
+                    frontrightDrive.setPower(searchPower);
+                    backleftDrive.setPower(searchPower);
+                    backrightDrive.setPower(searchPower);
+                 break;
+                }
+                if (!SubStateInitialized)
+                {
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, goldSoundID);
+                    SubStateInitialized = true;
+                    stopwatch.reset();
+                }
+                if (stopwatch.time() < 1.2) {
+                    frontleftDrive.setPower(-dancePower);
+                    frontrightDrive.setPower(dancePower);
+                    backleftDrive.setPower(dancePower);
+                    backrightDrive.setPower(-dancePower);
+                } else {
+                    stopwatch.reset();
+                    dancePower = -dancePower;
+                    danceRepeats++;
                 }
                 break;
             }
@@ -338,13 +380,13 @@ public class autoTest extends LinearOpMode {
                 }
                 if (currentSlideState == SlideState.STATE_SLIDE_IDLE && !SubStateStarted) {
                     currentClawState = ClawState.STATE_CLAW_OPEN;
-                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, goldSoundID);
+                   // SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, goldSoundID);
                     SubStateStarted = true;
                 }
                 if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
                     SetSlidePosition(780);
                     if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
-                        RequestRotation(-135, AutoRunState.STATE_DRIVE_TO_COLOR);
+                        currentState = AutoRunState.STATE_FINISH;
                         SubStateInitialized=false;
                         SubStateStarted=false;
                     }
@@ -372,7 +414,8 @@ public class autoTest extends LinearOpMode {
                     SubStateInitialized = true;
                     stopwatch.reset();
                 }
-                if (stopwatch.time() < 1.2) {
+                if (stopwatch.time() < 0.95) {
+                    SetSlidePosition(-100);
                     double searchPower = 0.4;
                     frontleftDrive.setPower(searchPower);
                     frontrightDrive.setPower(searchPower);
@@ -408,7 +451,7 @@ public class autoTest extends LinearOpMode {
                 final double OpenPosition = 0.45;
                 if (Math.abs(gripperDrive.getPosition() - OpenPosition)>floatEpislon) {
                     gripperDrive.setPosition(OpenPosition);
-                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
+                   // SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
                     gripperwatch.reset();
                 }
                 if (gripperwatch.time() > gripperChangeTime)
@@ -420,7 +463,7 @@ public class autoTest extends LinearOpMode {
             case STATE_CLAW_CLOSE: {
                 if (Math.abs(gripperDrive.getPosition() )>floatEpislon) {
                     gripperDrive.setPosition(0.0);
-                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, goldSoundID);
+                   // SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, goldSoundID);
                     gripperwatch.reset();
                 }
                 if (gripperwatch.time() > gripperChangeTime) {
@@ -471,7 +514,7 @@ public class autoTest extends LinearOpMode {
     }
     public void RequestRotation(double angle, AutoRunState stateNext)
     {
-       // YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
+        // YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
         //imu.resetYaw();
         //rotationalGoal += angle;// - ypr.getYaw(AngleUnit.DEGREES);
         //if (rotationalGoal == 0) {
@@ -496,7 +539,7 @@ public class autoTest extends LinearOpMode {
         telemetry.addData("colorSensor red", colors.red);
         telemetry.addData("colorDistance", ((DistanceSensor) colorSensor).getDistance(DistanceUnit.CM));
 
-        if (colors.blue > 0.011f)
+        if (colors.red > 0.0125f)
         {
             return true;
         }
