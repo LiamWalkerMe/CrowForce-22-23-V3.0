@@ -168,7 +168,7 @@ public class Teleop extends LinearOpMode {
             }
             // Controls grippers
             if (lBPress2) {
-                gripperDrive.setPosition(.25);
+                gripperDrive.setPosition(.45);
             }
             if (rBPress2) {
                 gripperDrive.setPosition(0);

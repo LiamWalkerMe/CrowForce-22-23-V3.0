@@ -171,13 +171,18 @@ public class autoTest extends LinearOpMode {
 
     }
     public void telemetry() {
-        telemetry.addData("Run Time", runtime.toString());
-        telemetry.addData("Front Right Encoder", frontrightDrive.getCurrentPosition());
-        telemetry.addData("Front Left Encoder", frontleftDrive.getCurrentPosition());
-        telemetry.addData("Back Right Encoder", backrightDrive.getCurrentPosition());
-        telemetry.addData("Back Left Encoder", backleftDrive.getCurrentPosition());
-        telemetry.addData("IMU Z Angle", imu.getRobotOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES).firstAngle);
-        telemetry.update();
+        //telemetry.addData("ColorTest:", colorTest() ? "Win" : "Fail");
+        telemetry.addData("CurrentState", currentState);
+        telemetry.addData("time", stopwatch.time());
+        telemetry.addData("distance", distanceSensor.getDistance(DistanceUnit.CM));
+        telemetry.addData("distance2", distanceSensorTwo.getDistance(DistanceUnit.CM));
+        YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
+
+        telemetry.addData("imu yaw:", ypr.getYaw(AngleUnit.DEGREES));
+        //telemetry.addData("imu pitch:", ypr.getPitch(AngleUnit.DEGREES));
+        //telemetry.addData("imu roll:", ypr.getRoll(AngleUnit.DEGREES));
+        //telemetry.addData("imu Orientation:", imu.getRobotOrientation(AxesReference.EXTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS).firstAngle);
+
     }
 
     public void initialize()
@@ -193,7 +198,7 @@ public class autoTest extends LinearOpMode {
         //sensors
         colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor");
         colorSensor.setGain(15.0f);
-        distanceSensorTwo = hardwareMap.get(DistanceSensor.class, "distanceSensor");
+        distanceSensorTwo = hardwareMap.get(DistanceSensor.class, "distanceSensorTwo");
         distanceSensor = hardwareMap.get(DistanceSensor.class, "distanceSensor");
 
 
@@ -203,6 +208,7 @@ public class autoTest extends LinearOpMode {
         backrightDrive.setDirection(DcMotor.Direction.FORWARD);
         middleSlideDrive.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        frontleftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         frontleftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         frontrightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         backleftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -235,24 +241,13 @@ public class autoTest extends LinearOpMode {
         // Wait for the game to start (driver presses PLAY)
         imu.initialize(myIMUparameters);
         imu.resetYaw();
-        SetSlidePosition(400);
+        SetSlidePosition(500);
 
         telemetry.setMsTransmissionInterval(50);
     }
 
     public void mainLoop() {
-        //telemetry.addData("ColorTest:", colorTest() ? "Win" : "Fail");
-        telemetry.addData("CurrentState", currentState);
-        telemetry.addData("time", stopwatch.time());
-        telemetry.addData("distance", distanceSensor.getDistance(DistanceUnit.CM));
-        YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
-        telemetry.addData("distance", distanceSensorTwo.getDistance(DistanceUnit.CM));
-
-        telemetry.addData("imu yaw:", ypr.getYaw(AngleUnit.DEGREES));
-        //telemetry.addData("imu pitch:", ypr.getPitch(AngleUnit.DEGREES));
-        //telemetry.addData("imu roll:", ypr.getRoll(AngleUnit.DEGREES));
-        //telemetry.addData("imu Orientation:", imu.getRobotOrientation(AxesReference.EXTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS).firstAngle);
-
+        telemetry();
         switch (currentState) {
             case STATE_BEGIN: {
                 if (drive.isBusy()) {
@@ -271,7 +266,7 @@ public class autoTest extends LinearOpMode {
                     backrightDrive.setPower(-1);
                     RequestRotation(90, AutoRunState.STATE_TO_CONE);
                 } else {
-                    double searchPower = 0.4;
+                    double searchPower = 0.45;
                     frontleftDrive.setPower(searchPower);
                     frontrightDrive.setPower(searchPower);
                     backleftDrive.setPower(searchPower);
@@ -280,6 +275,7 @@ public class autoTest extends LinearOpMode {
                 break;
             }
             case STATE_ROTATE: {
+                YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
                 double yaw = ypr.getYaw(AngleUnit.DEGREES);
                 double turnError = currentRotationalGoal-yaw;
                 double turnT = turnError/totalRotationCorrection;
@@ -308,7 +304,7 @@ public class autoTest extends LinearOpMode {
                 break;
             }
             case STATE_TO_CONE: {
-                if (stopwatch.time() > 0.5) {
+                if (distanceSensorTwo.getDistance(DistanceUnit.CM) < 10) {
                     frontleftDrive.setPower(0);
                     frontrightDrive.setPower(0);
                     backleftDrive.setPower(0);
@@ -316,7 +312,7 @@ public class autoTest extends LinearOpMode {
                     currentClawState = currentClawState.STATE_CLAW_CLOSE;
                     currentState = AutoRunState.STATE_WAIT_FOR_LIFT;
                 } else {
-                    double searchPower = 0.4;
+                    double searchPower = 0.2;
                     frontleftDrive.setPower(searchPower);
                     frontrightDrive.setPower(searchPower);
                     backleftDrive.setPower(searchPower);
@@ -409,8 +405,9 @@ public class autoTest extends LinearOpMode {
 
         switch (currentClawState) {
             case STATE_CLAW_OPEN: {
-                if (Math.abs(gripperDrive.getPosition() - 0.25)>floatEpislon) {
-                    gripperDrive.setPosition(0.25);
+                final double OpenPosition = 0.45;
+                if (Math.abs(gripperDrive.getPosition() - OpenPosition)>floatEpislon) {
+                    gripperDrive.setPosition(OpenPosition);
                     SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
                     gripperwatch.reset();
                 }
