@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode;
 
 import com.acmerobotics.roadrunner.geometry.Pose2d;
 import com.acmerobotics.roadrunner.geometry.Vector2d;
+import com.qualcomm.ftccommon.SoundPlayer;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.ftccommon.SoundPlayer;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -54,7 +55,8 @@ public class auto1 extends LinearOpMode {
     int crow2SoundID = 0;
     int crow3SoundID = 0;
     int chachaslideSoundID = 0;
-
+    int cawSoundID = 0;
+    int slideSoundID = 0;
 
     //State progress markers
     boolean SubStateInitialized = false;
@@ -89,6 +91,7 @@ public class auto1 extends LinearOpMode {
     public enum AutoRunState
     {
         STATE_BEGIN,
+        STATE_CAMERA,
         STATE_FIND_CONE,
         STATE_ROTATE,
         STATE_TO_CONE,
@@ -247,11 +250,32 @@ public class auto1 extends LinearOpMode {
         crow2SoundID   = hardwareMap.appContext.getResources().getIdentifier("crow2",   "raw", hardwareMap.appContext.getPackageName());
         crow3SoundID   = hardwareMap.appContext.getResources().getIdentifier("crow3",   "raw", hardwareMap.appContext.getPackageName());
         chachaslideSoundID   = hardwareMap.appContext.getResources().getIdentifier("chachaslide",   "raw", hardwareMap.appContext.getPackageName());
+        cawSoundID = hardwareMap.appContext.getResources().getIdentifier("caw", "raw", hardwareMap.appContext.getPackageName());
+        slideSoundID   = hardwareMap.appContext.getResources().getIdentifier("slide",   "raw", hardwareMap.appContext.getPackageName());
+
 
         stopwatch.reset();
         gripperwatch.reset();
         //Set up IMU
         imu = hardwareMap.get(IMU.class, "imu");
+        /*int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        OpenCvCamera camera = OpenCvCameraFactory.getInstance().createInternalCamera(OpenCvInternalCamera.CameraDirection.BACK, cameraMonitorViewId);
+        aprilTagDetectionPipeline = new AprilTagDetectionPipeline(tagSize, fx, fy, cx, cy);
+
+        camera.setPipeline(aprilTagDetectionPipeline);
+        camera.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
+            @Override
+            public void onOpened() {
+                camera.startStreaming(800, 448, OpenCvCameraRotation.SIDEWAYS_LEFT);
+            }
+
+            @Override
+            public void onError(int errorCode) {
+                // does nothing if error
+            }
+        });*/
+
+
         IMU.Parameters myIMUparameters;
 
         myIMUparameters = new IMU.Parameters(
@@ -265,6 +289,8 @@ public class auto1 extends LinearOpMode {
         imu.initialize(myIMUparameters);
         imu.resetYaw();
         SetSlidePosition(500);
+
+
 
         telemetry.setMsTransmissionInterval(50);
     }
@@ -298,6 +324,83 @@ public class auto1 extends LinearOpMode {
                 }
                 break;
             }
+            case STATE_CAMERA: {
+
+                ArrayList<AprilTagDetection> currentDetections = aprilTagDetectionPipeline.getLatestDetections();
+
+                if (currentDetections.size() != 0) {
+                    boolean tagFound = false;
+
+                    for (AprilTagDetection tag : currentDetections) {
+                        if (tag.id == tagOfInterest1) {
+                            tagOfInterest = tag;
+                            tagFound = true;
+                            tagPosition = 1;
+                            break;
+                        }
+
+                        if (tag.id == tagOfInterest2) {
+                            tagOfInterest = tag;
+                            tagFound = true;
+                            tagPosition = 2;
+                            break;
+                        }
+
+                        if (tag.id == tagOfInterest3) {
+                            tagOfInterest = tag;
+                            tagFound = true;
+                            tagPosition = 3;
+                            break;
+                        }
+                    }
+
+                    if (tagFound) {
+                        telemetry.addLine("Tag of interest is in sight at Position " + tagPosition);
+                        imu.resetYaw();
+                    } else {
+                        telemetry.addLine("Don't see tag of interest :(");
+                    }
+                }
+                telemetry.update();
+                sleep(20);  // is required or else system will break
+            }
+
+            if (tagOfInterest != null) {
+                telemetry.addLine("Tag was seen at position " + tagPosition);
+                telemetry.addLine("Executing plan " + tagPosition);
+                telemetry.update();
+
+                if (tagPosition == 1) {
+
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
+
+
+                }
+
+                if (tagPosition == 2) {
+
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
+
+                }
+
+                if (tagPosition == 3) {
+
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, silverSoundID);
+
+                }
+
+            } else {
+                telemetry.addLine("No tag available, it was never seen during the init loop :(");
+                telemetry.addLine("Backup plan INITIATED :)");
+                while (!hasRun) {
+
+                }
+                telemetry.update();
+            }
+
             case STATE_ROTATE: {
                 YawPitchRollAngles ypr = imu.getRobotYawPitchRollAngles();
                 double yaw = ypr.getYaw(AngleUnit.DEGREES);
