@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode;
 import com.acmerobotics.roadrunner.geometry.Pose2d;
 import com.acmerobotics.roadrunner.geometry.Vector2d;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.ftccommon.SoundPlayer;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
@@ -20,6 +21,11 @@ import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
 import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequence;
 import org.openftc.apriltag.AprilTagDetection;
 import org.openftc.easyopencv.OpenCvCamera;
+import org.openftc.easyopencv.OpenCvCameraFactory;
+import org.openftc.easyopencv.OpenCvCameraRotation;
+import org.openftc.easyopencv.OpenCvInternalCamera;
+
+import java.util.ArrayList;
 
 @com.qualcomm.robotcore.eventloop.opmode.Autonomous(name = "auto1", group = "tournament Autos" )
 
@@ -44,6 +50,11 @@ public class auto1 extends LinearOpMode {
     //Sound resources
     int silverSoundID = 0;
     int goldSoundID = 0;
+    int crow1SoundID = 0;
+    int crow2SoundID = 0;
+    int crow3SoundID = 0;
+    int chachaslideSoundID = 0;
+
 
     //State progress markers
     boolean SubStateInitialized = false;
@@ -154,6 +165,7 @@ public class auto1 extends LinearOpMode {
         telemetry.update();
         currentState=AutoRunState.STATE_BEGIN;
         while (currentState != AutoRunState.STATE_FINISH) {
+            updateCamera();
             mainLoop();
             updateClaw();
             updateSlide();
@@ -211,9 +223,30 @@ public class auto1 extends LinearOpMode {
         backrightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         middleSlideDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
+        //Camera
+        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        OpenCvCamera camera = OpenCvCameraFactory.getInstance().createInternalCamera(OpenCvInternalCamera.CameraDirection.BACK, cameraMonitorViewId);
+        aprilTagDetectionPipeline = new AprilTagDetectionPipeline(tagSize, fx, fy, cx, cy);
+
+        camera.setPipeline(aprilTagDetectionPipeline);
+        camera.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
+            @Override
+            public void onOpened() {
+                camera.startStreaming(800, 448, OpenCvCameraRotation.UPRIGHT);
+            }
+
+            @Override
+            public void onError(int errorCode) {
+                // does nothing if error
+            }
+        });
         // Sound resources (see SoundTest.java)
         silverSoundID = hardwareMap.appContext.getResources().getIdentifier("silver", "raw", hardwareMap.appContext.getPackageName());
         goldSoundID   = hardwareMap.appContext.getResources().getIdentifier("gold",   "raw", hardwareMap.appContext.getPackageName());
+        crow1SoundID   = hardwareMap.appContext.getResources().getIdentifier("crow1",   "raw", hardwareMap.appContext.getPackageName());
+        crow2SoundID   = hardwareMap.appContext.getResources().getIdentifier("crow2",   "raw", hardwareMap.appContext.getPackageName());
+        crow3SoundID   = hardwareMap.appContext.getResources().getIdentifier("crow3",   "raw", hardwareMap.appContext.getPackageName());
+        chachaslideSoundID   = hardwareMap.appContext.getResources().getIdentifier("chachaslide",   "raw", hardwareMap.appContext.getPackageName());
 
         stopwatch.reset();
         gripperwatch.reset();
@@ -396,7 +429,57 @@ public class auto1 extends LinearOpMode {
         }
         telemetry.update();
     }
+    public void updateCamera() {
+        if (tagOfInterest == null) {
+            telemetry.addLine("xaeruac upadete(");
+            ArrayList<AprilTagDetection> currentDetections = aprilTagDetectionPipeline.getLatestDetections();
 
+            if (currentDetections.size() != 0) {
+                boolean tagFound = false;
+
+                for (AprilTagDetection tag : currentDetections) {
+                    if (tag.id == tagOfInterest1) {
+                        tagOfInterest = tag;
+                        tagFound = true;
+                        tagPosition = 1;
+                        break;
+                    }
+
+                    if (tag.id == tagOfInterest2) {
+                        tagOfInterest = tag;
+                        tagFound = true;
+                        tagPosition = 2;
+                        break;
+                    }
+
+                    if (tag.id == tagOfInterest3) {
+                        tagOfInterest = tag;
+                        tagFound = true;
+                        tagPosition = 3;
+                        break;
+                    }
+                }
+
+                if (tagFound) {
+                    telemetry.addLine("Tag of interest is in sight at Position " + tagPosition);
+                    cameraPlaySound();
+                } else {
+                    telemetry.addLine("Don't see tag of interest :(");
+                }
+            }
+
+            //sleep(20);  // is required or else system will break
+        }
+    }
+    public void cameraPlaySound() {
+        if (tagPosition == 1) {
+            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow2SoundID);
+        } else if (tagPosition == 2) {
+            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow3SoundID);
+        } else {
+            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow1SoundID);
+        }
+    }
     public void updateClaw() {
         telemetry.addData("CurrentClawState", currentClawState);
         telemetry.addData("Gripper Position", gripperDrive.getPosition());
