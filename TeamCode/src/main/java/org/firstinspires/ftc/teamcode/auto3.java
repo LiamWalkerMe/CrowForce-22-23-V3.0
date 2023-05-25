@@ -377,7 +377,7 @@ public class auto3 extends LinearOpMode {
                     SubStateStarted = true;
                 }
                 if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
-                    SetSlidePosition(780);
+                    SetSlidePosition(1300);
                     if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
                         RequestRotation(-135, AutoRunState.STATE_DRIVE_TO_COLOR);
                         SubStateInitialized=false;
@@ -476,11 +476,11 @@ public class auto3 extends LinearOpMode {
     }
     public void cameraPlaySound() {
         if (tagPosition == 1) {
-            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow1SoundID);
-        } else if (tagPosition == 2) {
-            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow2SoundID);
-        } else {
             SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow3SoundID);
+        } else if (tagPosition == 2) {
+            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow1SoundID);
+        } else {
+            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow2SoundID);
         }
     }
     public void updateClaw() {
@@ -582,7 +582,7 @@ public class auto3 extends LinearOpMode {
         telemetry.addData("colorSensor red", colors.red);
         telemetry.addData("colorDistance", ((DistanceSensor) colorSensor).getDistance(DistanceUnit.CM));
 
-        if (colors.blue > 0.011f)
+        if (colors.blue > 0.009)
         {
             return true;
         }

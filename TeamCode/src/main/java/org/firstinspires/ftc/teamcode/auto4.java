@@ -368,21 +368,22 @@ public class auto4 extends LinearOpMode {
                 break;
             }
             case STATE_DANCE: {
+                if (!SubStateInitialized)
+                {
+                    danceRepeats = 0;
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, chachaslideSoundID);
+                    SubStateInitialized = true;
+                    stopwatch.reset();
+                }
                 if (danceRepeats == 5) {
-                 currentState = AutoRunState.STATE_DROP_CONE;
-                 SubStateInitialized = false;
+                    currentState = AutoRunState.STATE_DROP_CONE;
+                    SubStateInitialized = false;
                     double searchPower = 0.0;
                     frontleftDrive.setPower(searchPower);
                     frontrightDrive.setPower(searchPower);
                     backleftDrive.setPower(searchPower);
                     backrightDrive.setPower(searchPower);
-                 break;
-                }
-                if (!SubStateInitialized)
-                {
-                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, chachaslideSoundID);
-                    SubStateInitialized = true;
-                    stopwatch.reset();
+                    break;
                 }
                 if (stopwatch.time() < 1.2) {
                     frontleftDrive.setPower(-dancePower);
@@ -507,11 +508,11 @@ public class auto4 extends LinearOpMode {
     }
     public void cameraPlaySound() {
         if (tagPosition == 1) {
-            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow3SoundID);
-        } else if (tagPosition == 2) {
-            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow1SoundID);
-        } else {
             SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow2SoundID);
+        } else if (tagPosition == 2) {
+            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow3SoundID);
+        } else {
+            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow1SoundID);
         }
     }
     public void updateClaw() {

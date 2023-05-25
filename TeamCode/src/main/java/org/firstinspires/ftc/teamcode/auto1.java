@@ -477,7 +477,7 @@ public class auto1 extends LinearOpMode {
                     SubStateStarted = true;
                 }
                 if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
-                    SetSlidePosition(780);
+                    SetSlidePosition(1300);
                     if (currentSlideState == SlideState.STATE_SLIDE_IDLE && currentClawState == ClawState.STATE_CLAW_IDLE) {
                         RequestRotation(-135, AutoRunState.STATE_DRIVE_TO_COLOR);
                         SubStateInitialized=false;
@@ -682,7 +682,7 @@ public class auto1 extends LinearOpMode {
         telemetry.addData("colorSensor red", colors.red);
         telemetry.addData("colorDistance", ((DistanceSensor) colorSensor).getDistance(DistanceUnit.CM));
 
-        if (colors.blue > 0.011f)
+        if (colors.blue > 0.009f)
         {
             return true;
         }
