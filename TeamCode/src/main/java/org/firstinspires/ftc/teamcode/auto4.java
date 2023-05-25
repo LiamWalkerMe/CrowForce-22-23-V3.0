@@ -380,7 +380,7 @@ public class auto4 extends LinearOpMode {
                 }
                 if (!SubStateInitialized)
                 {
-                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, goldSoundID);
+                    SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, chachaslideSoundID);
                     SubStateInitialized = true;
                     stopwatch.reset();
                 }
