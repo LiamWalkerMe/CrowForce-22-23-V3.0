@@ -475,11 +475,11 @@ public class auto2 extends LinearOpMode {
     }
     public void cameraPlaySound() {
         if (tagPosition == 1) {
-            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow1SoundID);
-        } else if (tagPosition == 2) {
             SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow2SoundID);
-        } else {
+        } else if (tagPosition == 2) {
             SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow3SoundID);
+        } else {
+            SoundPlayer.getInstance().startPlaying(hardwareMap.appContext, crow1SoundID);
         }
     }
     public void updateClaw() {
